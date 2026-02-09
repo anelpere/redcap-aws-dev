@@ -595,22 +595,17 @@ Resources:
         - !Ref SubnetDataA
         - !Ref SubnetDataB
 
-# SSM Parameters for REDCap credentials
-  RedcapUsernameParameter:
-    Type: AWS::SSM::Parameter
+# Secrets Manager for REDCap credentials
+  RedcapCredentialsSecret:
+    Type: AWS::SecretsManager::Secret
     Properties:
-      Name: redcap_username
-      Type: String
-      Value: !Ref RedcapUname
-      Description: REDCap Community Username
-
-  RedcapPasswordParameter:
-    Type: AWS::SSM::Parameter
-    Properties:
-      Name: redcap_password
-      Type: SecureString
-      Value: !Ref RedcapPword
-      Description: REDCap Community Password
+      Name: !Sub "${EBEndpoint}-redcap-credentials"
+      Description: REDCap Community Credentials
+      SecretString: !Sub |
+        {
+          "username": "${RedcapUname}",
+          "password": "${RedcapPword}"
+        }
 
 # Lambda Bundle Creator log configuration
   RedcapBundleLambdaLogGroup:  
@@ -657,19 +652,21 @@ Resources:
                 Resource: "*"
               - Effect: Allow
                 Action:
+                  - secretsmanager:GetSecretValue
+                Resource: 
+                  - !Ref RedcapCredentialsSecret
+              - Effect: Allow
+                Action:
                   - ssm:PutParameter
                   - ssm:GetParameter
                 Resource: 
                   - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/redcap_salt"
-                  - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/redcap_username"
-                  - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/redcap_password"
 
   RedcapBundleLambda:
     Type: AWS::Lambda::Function
     DependsOn: 
       - RDSCluster
-      - RedcapUsernameParameter
-      - RedcapPasswordParameter
+      - RedcapCredentialsSecret
     Properties:
       FunctionName: !Sub "${EBEndpoint}-redcap-bundle-creator"
       Runtime: python3.12
@@ -696,6 +693,7 @@ Resources:
                   eb = boto3.client('elasticbeanstalk')
                   http = urllib3.PoolManager()
                   
+                  secrets = boto3.client('secretsmanager')
                   ssm = boto3.client('ssm')
                   
                   # Get parameters
@@ -704,10 +702,12 @@ Resources:
                   redcap_s3_key = '${RedcapS3Key}'
                   redcap_s3_region = '${RedcapS3BucketRegion}'
                   
-                  # Get REDCap credentials from SSM if using API download
+                  # Get REDCap credentials from Secrets Manager if using API download
                   if s3_or_api == 'Download using REDCap API':
-                      redcap_username = ssm.get_parameter(Name='redcap_username')['Parameter']['Value']
-                      redcap_password = ssm.get_parameter(Name='redcap_password', WithDecryption=True)['Parameter']['Value']
+                      secret_response = secrets.get_secret_value(SecretId='${RedcapCredentialsSecret}')
+                      credentials = json.loads(secret_response['SecretString'])
+                      redcap_username = credentials['username']
+                      redcap_password = credentials['password']
                   else:
                       redcap_username = ''
                       redcap_password = ''
