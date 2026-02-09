@@ -615,7 +615,6 @@ Resources:
       LogGroupName: !Sub "/aws/lambda/${EBEndpoint}-redcap-bundle-creator"
       RetentionInDays: 7
 
-
 # Lambda function to create REDCap Elastic Beanstalk bundle
   RedcapBundleLambdaRole:
     Type: AWS::IAM::Role
@@ -669,6 +668,9 @@ Resources:
       - RedcapCredentialsSecret
     Properties:
       FunctionName: !Sub "${EBEndpoint}-redcap-bundle-creator"
+      Architectures:
+        - arm64
+      MemorySize: 256
       Runtime: python3.12
       Handler: index.lambda_handler
       Role: !GetAtt RedcapBundleLambdaRole.Arn
@@ -965,6 +967,7 @@ Resources:
                       error_msg = 'Authentication error occurred'
                   print(f'Error: {error_msg}')
                   cfnresponse.send(event, context, cfnresponse.FAILED, {})
+  
   RedcapBundleCustomResource:
     Type: AWS::CloudFormation::CustomResource
     Properties:
