@@ -59,7 +59,6 @@ Parameters:
     Type: String
   DatabaseInstanceType:
     AllowedValues:
-      - db.t3.small
       - db.t3.medium
       - db.t3.large
       - db.r5.large
@@ -558,7 +557,7 @@ Resources:
       MasterUserPassword: !Ref DatabaseMasterPassword
       DatabaseName: 'redcap'
       Engine: aurora-mysql
-      EngineVersion: 5.7
+      EngineVersion: 8.0
       StorageEncrypted: 'True'
       Port: 3306
       DBSubnetGroupName:

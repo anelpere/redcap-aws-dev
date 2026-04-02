@@ -233,7 +233,6 @@ Parameters:
     Type: String
   DatabaseInstanceType:
     AllowedValues:
-      - db.t3.small
       - db.t3.medium
       - db.t3.large
       - db.r5.large
