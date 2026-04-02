@@ -67,6 +67,8 @@ IAM_INSTANCE_PROFILE=$(echo "$CONFIG" | jq -r '.[] | select(.Namespace=="aws:aut
 SERVICE_ROLE=$(echo "$CONFIG" | jq -r '.[] | select(.Namespace=="aws:elasticbeanstalk:environment" and .OptionName=="ServiceRole") | .Value')
 INSTANCE_TYPE=$(echo "$CONFIG" | jq -r '.[] | select(.Namespace=="aws:autoscaling:launchconfiguration" and .OptionName=="InstanceType") | .Value')
 KEY_NAME=$(echo "$CONFIG" | jq -r '.[] | select(.Namespace=="aws:autoscaling:launchconfiguration" and .OptionName=="EC2KeyName") | .Value')
+LB_MIN_SIZE=$(echo "$CONFIG" | jq -r '.[] | select(.Namespace=="aws:autoscaling:asg" and .OptionName=="MinSize") | .Value')
+LB_MAX_SIZE=$(echo "$CONFIG" | jq -r '.[] | select(.Namespace=="aws:autoscaling:asg" and .OptionName=="MaxSize") | .Value')
 
 echo ""
 echo "=== Captured Configuration ==="
@@ -142,7 +144,8 @@ OPTION_SETTINGS="[
     {\"Namespace\":\"aws:autoscaling:launchconfiguration\",\"OptionName\":\"IamInstanceProfile\",\"Value\":\"$IAM_INSTANCE_PROFILE\"},
     {\"Namespace\":\"aws:elasticbeanstalk:environment\",\"OptionName\":\"ServiceRole\",\"Value\":\"$SERVICE_ROLE\"},
     {\"Namespace\":\"aws:autoscaling:launchconfiguration\",\"OptionName\":\"InstanceType\",\"Value\":\"$INSTANCE_TYPE\"},
-    {\"Namespace\":\"aws:elasticbeanstalk:container:php:phpini\",\"OptionName\":\"document_root\",\"Value\":\"/redcap\"}
+    {\"Namespace\":\"aws:elasticbeanstalk:container:php:phpini\",\"OptionName\":\"document_root\",\"Value\":\"/redcap\"},
+    {\"Namespace\":\"aws:elasticbeanstalk:environment\",\"OptionName\":\"LoadBalancerType\",\"Value\":\"application\"}
 ]"
 
 if [ "$KEY_NAME" != "null" ] && [ -n "$KEY_NAME" ]; then
