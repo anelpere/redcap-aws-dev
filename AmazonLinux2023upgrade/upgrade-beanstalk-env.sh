@@ -108,7 +108,7 @@ cd extracted
 CONFIG_SCRIPT=$(find . -name "99redcap_config.sh" -type f)
 if [ -n "$CONFIG_SCRIPT" ]; then
     echo "Found: $CONFIG_SCRIPT"
-    sed -i.bak 's/yum install -y php-ldap sendmail-cf/dnf install -y php-ldap sendmail-cf postfix/' "$CONFIG_SCRIPT"
+    sed -i.bak 's/yum install -y php-ldap sendmail-cf/dnf install -y php-ldap sendmail-cf postfix mariadb105/' "$CONFIG_SCRIPT"
     echo "Updated yum to dnf and added postfix package"
     rm -f "${CONFIG_SCRIPT}.bak"
 else
