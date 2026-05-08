@@ -780,6 +780,17 @@ Resources:
                             ('redcap_updates_password_encrypted', '0');
                             update redcap_user_information set account_manager = 1, access_system_config = 1, access_system_upgrade = 1,
                               access_external_module_install = 1, admin_rights = 1, access_admin_dashboards = 1 where super_user = 1;
+                        "/create-redcap-tables.sql":
+                          mode: "000755"
+                          owner: root
+                          group: root
+                          source: https://${EBBucket}.s3.${AWS::Region}.amazonaws.com/create-redcap-tables.sql
+                          authentication: S3Auth
+                      Resources:
+                        S3Auth:
+                          Type: S3
+                          buckets:
+                            - ${EBBucket}
                   """)
                   
                   # .ebextensions/00HIPAA.config
@@ -861,6 +872,9 @@ Resources:
                       
                       # If this is the leader-node and if the REDCap schema hasn't already been applied
                       if [ -e /leaderonly ]; then
+                        #Create redcap tables (leader-only, idempotent with IF NOT EXISTS)
+                        mysql -h ${RDSCluster.Endpoint.Address} -u master -D redcap --password='${DatabaseMasterPassword}' < /create-redcap-tables.sql
+
                         if ! mysql -h ${RDSCluster.Endpoint.Address} -u master -D redcap --password='${DatabaseMasterPassword}' -e "select * from redcap_actions"; then
                                 count=0
                                 while ! [ -s /curl.out ] && [ $count -ne "100" ];
@@ -876,7 +890,7 @@ Resources:
                                 mysql -h ${RDSCluster.Endpoint.Address} -u master -D redcap --password='${DatabaseMasterPassword}' < /create-initial-user.sql
                         fi
                       fi
-                      rm -f /curl.out /mysql.sql /mysql-rc.sql /create-redcap-user.sql /create-initial-user.sql
+                      rm -f /curl.out /mysql.sql /mysql-rc.sql /create-redcap-user.sql /create-initial-user.sql /create-redcap-tables.sql
                       
                       #Apply additional PHP configuration as specified by REDCap
                       echo "max_input_vars = 100000" >> /etc/php.ini
@@ -1047,6 +1061,27 @@ Resources:
                       s3.create_bucket(Bucket=eb_bucket)
                   except:
                       pass  # Bucket might already exist
+                  
+                  # Extract and upload the REDCap installation SQL to S3
+                  # The SQL is extracted from the REDCap zip and modified for idempotency
+                  with zipfile.ZipFile(io.BytesIO(redcap_zip_data), 'r') as redcap_zipfile:
+                      install_sql = None
+                      for name in redcap_zipfile.namelist():
+                          if name.endswith('Resources/sql/install.sql'):
+                              install_sql = redcap_zipfile.read(name).decode('utf-8')
+                              break
+                      
+                      if install_sql:
+                          # Make CREATE TABLE statements idempotent
+                          install_sql = install_sql.replace('CREATE TABLE ', 'CREATE TABLE IF NOT EXISTS ')
+                          # Fix hardcoded base URL
+                          install_sql = install_sql.replace(
+                              "UPDATE redcap_config SET value = 'http://anelpere-ec2-temp-test-4.us-east-1.elasticbeanstalk.com/' WHERE field_name = 'redcap_base_url'",
+                              "UPDATE redcap_config SET value = 'https://${EBEndpoint}.${AWS::Region}.elasticbeanstalk.com/' WHERE field_name = 'redcap_base_url'"
+                          )
+                          s3.put_object(Bucket=eb_bucket, Key='create-redcap-tables.sql', Body=install_sql.encode('utf-8'))
+                      else:
+                          print('WARNING: install.sql not found in REDCap zip')
                   
                   s3.put_object(Bucket=eb_bucket, Key='redcap-eb.zip', Body=output_zip.getvalue())
                   
