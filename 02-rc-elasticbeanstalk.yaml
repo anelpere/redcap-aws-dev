@@ -627,6 +627,7 @@ Resources:
             Action: sts:AssumeRole
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
       Policies:
         - PolicyName: S3Access
           PolicyDocument:
@@ -663,7 +664,7 @@ Resources:
   RedcapBundleLambda:
     Type: AWS::Lambda::Function
     DependsOn: 
-      - RDSCluster
+      - RDSDBInstance1
       - RedcapCredentialsSecret
     Properties:
       FunctionName: !Sub "${EBEndpoint}-redcap-bundle-creator"
@@ -674,6 +675,12 @@ Resources:
       Handler: index.lambda_handler
       Role: !GetAtt RedcapBundleLambdaRole.Arn
       Timeout: 900
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref SGApp
+        SubnetIds:
+          - !Ref SubnetAppA
+          - !Ref SubnetAppB
       Code:
         ZipFile: !Sub |
           import json
