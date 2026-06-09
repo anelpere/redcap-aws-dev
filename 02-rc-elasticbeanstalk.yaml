@@ -670,7 +670,7 @@ Resources:
       FunctionName: !Sub "${EBEndpoint}-redcap-bundle-creator"
       Architectures:
         - arm64
-      MemorySize: 256
+      MemorySize: 512
       Runtime: python3.12
       Handler: index.lambda_handler
       Role: !GetAtt RedcapBundleLambdaRole.Arn
@@ -685,6 +685,7 @@ Resources:
         ZipFile: !Sub |
           import json
           import boto3
+          import botocore.config
           import urllib3
           import zipfile
           import io
@@ -728,8 +729,20 @@ Resources:
                   
                   # Download REDCap
                   if s3_or_api == 'Provide in S3':
-                      response = s3.get_object(Bucket=redcap_s3_bucket, Key=redcap_s3_key)
+                      s3_config = botocore.config.Config(read_timeout=300, connect_timeout=60, retries={'max_attempts': 3})
+                      s3_regional = boto3.client('s3', region_name=redcap_s3_region, config=s3_config)
+                      print(f'Downloading from s3://{redcap_s3_bucket}/{redcap_s3_key} in region {redcap_s3_region}')
+                      response = s3_regional.get_object(Bucket=redcap_s3_bucket, Key=redcap_s3_key)
+                      content_length = response['ContentLength']
+                      print(f'S3 object ContentLength: {content_length}')
                       redcap_zip_data = response['Body'].read()
+                      print(f'Downloaded {len(redcap_zip_data)} bytes from S3')
+                      if len(redcap_zip_data) != content_length:
+                          raise Exception(f'Incomplete download: got {len(redcap_zip_data)} of {content_length} bytes')
+                      # Validate it's a zip before proceeding
+                      if redcap_zip_data[:4] != b'PK\x03\x04' and redcap_zip_data[:4] != b'PK\x05\x06':
+                          print(f'First 100 bytes: {redcap_zip_data[:100]}')
+                          raise Exception(f'Downloaded file is not a valid zip. First 4 bytes: {redcap_zip_data[:4]}')
                   else:
                       import urllib.parse
                       data = {
