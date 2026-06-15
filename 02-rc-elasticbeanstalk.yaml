@@ -694,6 +694,7 @@ Resources:
           import cfnresponse
           
           def lambda_handler(event, context):
+              print(f'HANDLER INVOKED - RequestType: {event.get("RequestType")} - v2')
               try:
                   if event['RequestType'] == 'Delete':
                       cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
@@ -711,6 +712,7 @@ Resources:
                   redcap_s3_bucket = '${RedcapS3Bucket}'
                   redcap_s3_key = '${RedcapS3Key}'
                   redcap_s3_region = '${RedcapS3BucketRegion}'
+                  print(f'PARAMS: s3_or_api={s3_or_api}, bucket={redcap_s3_bucket}, key={redcap_s3_key}, region={redcap_s3_region}')
                   
                   # Get REDCap credentials from Secrets Manager if using API download
                   if s3_or_api == 'Download using REDCap API':
