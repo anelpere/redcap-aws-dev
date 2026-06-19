@@ -377,7 +377,9 @@ Resources:
             Statement:
               - Sid: BucketAccess
                 Action:
-                  - 's3:*'
+                  - 's3:GetObject'
+                  - 's3:GetBucketLocation'
+                  - 's3:ListBucket'
                 Effect: Allow
                 Resource:
                   - !Join 
