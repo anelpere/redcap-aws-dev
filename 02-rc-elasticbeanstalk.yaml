@@ -769,39 +769,35 @@ Resources:
                         leaderonly:
                           command: "touch /leaderonly"
                           leader_only: True
-                      files:
-                        "/create-redcap-user.sql":
-                          mode: "000755"
-                          owner: root
-                          group: root
-                          content: |
-                            CREATE USER IF NOT EXISTS 'redcap_user'@'%' IDENTIFIED BY '${DatabaseMasterPassword}';
-                            GRANT SELECT, INSERT, UPDATE, DELETE ON `redcap`.* TO 'redcap_user'@'%';
-                            FLUSH PRIVILEGES;
-                            CREATE USER IF NOT EXISTS 'redcap_user2'@'%' IDENTIFIED BY '${DatabaseMasterPassword}';
-                            GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, ALTER, REFERENCES ON `redcap`.* TO 'redcap_user2'@'%';
-                            FLUSH PRIVILEGES;
-                        "/create-initial-user.sql":
-                          mode: "000755"
-                          owner: root
-                          group: root
-                          content: |
-                            UPDATE redcap_config SET value = 'table' WHERE field_name = 'auth_meth_global';
-                            INSERT INTO redcap_user_information (username, user_email, user_firstname, user_lastname, super_user) VALUES ('redcap_admin', 'joe.user@projectredcap.org', 'REDCap', 'Administrator', '1');
-                            INSERT INTO redcap_auth (username, password, legacy_hash, temp_pwd) VALUES ('redcap_admin', MD5('${DatabaseMasterPassword}'), '1', '1');
-                            UPDATE redcap_user_information SET super_user = '0' WHERE username = 'site_admin';
-                            UPDATE redcap_config set value = '2' where field_name = 'edoc_storage_option';
-                            UPDATE redcap_config SET value = '${S3FileRepositoryBucket}' WHERE field_name = 'amazon_s3_bucket';
-                            UPDATE redcap_config SET value = '${S3AccessKey}' WHERE field_name = 'amazon_s3_key';
-                            UPDATE redcap_config SET value = '${S3SecretKey}' WHERE field_name = 'amazon_s3_secret';
-                            UPDATE redcap_config SET value = '${AWS::Region}' WHERE field_name = 'amazon_s3_endpoint';
-                            REPLACE INTO redcap_config (field_name, value) VALUES ('aws_quickstart', '1');
-                            REPLACE INTO redcap_config (field_name, value) VALUES
-                            ('redcap_updates_user', 'redcap_user2'),
-                            ('redcap_updates_password', '${DatabaseMasterPassword}'),
-                            ('redcap_updates_password_encrypted', '0');
-                            update redcap_user_information set account_manager = 1, access_system_config = 1, access_system_upgrade = 1,
-                              access_external_module_install = 1, admin_rights = 1, access_admin_dashboards = 1 where super_user = 1;
+                  """)
+                  
+                  # SQL file contents to include in the bundle
+                  create_redcap_user_sql = textwrap.dedent("""\
+                      CREATE USER IF NOT EXISTS 'redcap_user'@'%' IDENTIFIED BY '${DatabaseMasterPassword}';
+                      GRANT SELECT, INSERT, UPDATE, DELETE ON `redcap`.* TO 'redcap_user'@'%';
+                      FLUSH PRIVILEGES;
+                      CREATE USER IF NOT EXISTS 'redcap_user2'@'%' IDENTIFIED BY '${DatabaseMasterPassword}';
+                      GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, ALTER, REFERENCES ON `redcap`.* TO 'redcap_user2'@'%';
+                      FLUSH PRIVILEGES;
+                  """)
+                  
+                  create_initial_user_sql = textwrap.dedent("""\
+                      UPDATE redcap_config SET value = 'table' WHERE field_name = 'auth_meth_global';
+                      INSERT INTO redcap_user_information (username, user_email, user_firstname, user_lastname, super_user) VALUES ('redcap_admin', 'joe.user@projectredcap.org', 'REDCap', 'Administrator', '1');
+                      INSERT INTO redcap_auth (username, password, legacy_hash, temp_pwd) VALUES ('redcap_admin', MD5('${DatabaseMasterPassword}'), '1', '1');
+                      UPDATE redcap_user_information SET super_user = '0' WHERE username = 'site_admin';
+                      UPDATE redcap_config set value = '2' where field_name = 'edoc_storage_option';
+                      UPDATE redcap_config SET value = '${S3FileRepositoryBucket}' WHERE field_name = 'amazon_s3_bucket';
+                      UPDATE redcap_config SET value = '${S3AccessKey}' WHERE field_name = 'amazon_s3_key';
+                      UPDATE redcap_config SET value = '${S3SecretKey}' WHERE field_name = 'amazon_s3_secret';
+                      UPDATE redcap_config SET value = '${AWS::Region}' WHERE field_name = 'amazon_s3_endpoint';
+                      REPLACE INTO redcap_config (field_name, value) VALUES ('aws_quickstart', '1');
+                      REPLACE INTO redcap_config (field_name, value) VALUES
+                      ('redcap_updates_user', 'redcap_user2'),
+                      ('redcap_updates_password', '${DatabaseMasterPassword}'),
+                      ('redcap_updates_password_encrypted', '0');
+                      update redcap_user_information set account_manager = 1, access_system_config = 1, access_system_upgrade = 1,
+                        access_external_module_install = 1, admin_rights = 1, access_admin_dashboards = 1 where super_user = 1;
                   """)
                   
                   # .ebextensions/00HIPAA.config
@@ -876,10 +872,10 @@ Resources:
                       touch /var/log/eb-activity.log
                       
                       #Create the REDCap CRON entry
-                      (crontab -l ; echo -e "# REDCap Cron Job (runs every minute)\\n* * * * * /usr/bin/php /var/app/current/redcap/cron.php > /dev/null") | crontab
+                      (crontab -l 2>/dev/null ; echo -e "# REDCap Cron Job (runs every minute)\\n* * * * * /usr/bin/php /var/app/current/redcap/cron.php > /dev/null") | crontab
                       
                       #Create redcap_user and redcap_user2
-                      mysql -h ${RDSCluster.Endpoint.Address} -u master -D redcap --password='${DatabaseMasterPassword}' < /create-redcap-user.sql
+                      mysql -h ${RDSCluster.Endpoint.Address} -u master -D redcap --password='${DatabaseMasterPassword}' < /var/app/current/create-redcap-user.sql
                       
                       # If this is the leader-node and if the REDCap schema hasn't already been applied
                       if [ -e /leaderonly ]; then
@@ -898,10 +894,10 @@ Resources:
                                 sed -i -e "1d" /curl.out
                                 temp=`tail -1 /curl.out | cut -d';' -f1`; sed '$$d' /curl.out > /mysql-rc.sql; echo $$temp';' >> /mysql-rc.sql
                                 mysql -h ${RDSCluster.Endpoint.Address} -u master -D redcap --password='${DatabaseMasterPassword}' < /mysql-rc.sql
-                                mysql -h ${RDSCluster.Endpoint.Address} -u master -D redcap --password='${DatabaseMasterPassword}' < /create-initial-user.sql
+                                mysql -h ${RDSCluster.Endpoint.Address} -u master -D redcap --password='${DatabaseMasterPassword}' < /var/app/current/create-initial-user.sql
                         fi
                       fi
-                      rm -f /curl.out /mysql.sql /mysql-rc.sql /create-redcap-user.sql /create-initial-user.sql
+                      rm -f /curl.out /mysql.sql /mysql-rc.sql
                       
                       #Apply additional PHP configuration as specified by REDCap
                       echo "max_input_vars = 100000" >> /etc/php.ini
@@ -1053,6 +1049,8 @@ Resources:
                       '.platform/nginx/conf.d/elasticbeanstalk/deny-temp.conf': deny_temp_conf,
                       '.platform/nginx/nginx.conf': nginx_conf,
                       '.platform/php.d/aws.ini': php_ini,
+                      'create-redcap-user.sql': create_redcap_user_sql,
+                      'create-initial-user.sql': create_initial_user_sql,
                   }
                   
                   # Extract the REDCap installation SQL and modify for idempotency
