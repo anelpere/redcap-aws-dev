@@ -868,6 +868,7 @@ Resources:
                       
                       systemctl restart nginx
                       systemctl restart php-fpm
+                      sleep 5
                       
                       touch /var/log/eb-activity.log
                       
@@ -884,17 +885,23 @@ Resources:
 
                         if [ $(mysql -h ${RDSCluster.Endpoint.Address} -u master -D redcap --password='${DatabaseMasterPassword}' -N -e "select count(*) from redcap_actions") -eq 0 ]; then
                                 count=0
-                                while ! [ -s /curl.out ] && [ $count -ne "100" ];
+                                while [ $count -ne "100" ];
                                 do
-                                  (curl -o /curl.out -k -F redcap_csrf_token= -F superusers_only_create_project=0 -F superusers_only_move_to_prod=1 -F auto_report_stats=1 -F bioportal_api_token= -F redcap_base_url='https://localhost/' -F enable_url_shortener=1 -F default_datetime_format='D/M/Y_12' -F default_number_format_decimal=, -F default_number_format_thousands_sep=. -F homepage_contact='REDCap Administrator (123-456-7890)' -F homepage_contact_email=email@yoursite.edu -F project_contact_name='REDCap Administrator (123-456-7890)' -F project_contact_email=email@yoursite.edu -F institution='SoAndSo University' -F site_org_type='SoAndSo Institute for Clinical and Translational Research' -F hook_functions_file='/var/app/current/redcap/hook_functions.php' http://localhost/install.php)
+                                  curl -o /curl.out -k -F redcap_csrf_token= -F superusers_only_create_project=0 -F superusers_only_move_to_prod=1 -F auto_report_stats=1 -F bioportal_api_token= -F redcap_base_url='https://localhost/' -F enable_url_shortener=1 -F default_datetime_format='D/M/Y_12' -F default_number_format_decimal=, -F default_number_format_thousands_sep=. -F homepage_contact='REDCap Administrator (123-456-7890)' -F homepage_contact_email=email@yoursite.edu -F project_contact_name='REDCap Administrator (123-456-7890)' -F project_contact_email=email@yoursite.edu -F institution='SoAndSo University' -F site_org_type='SoAndSo Institute for Clinical and Translational Research' -F hook_functions_file='/var/app/current/redcap/hook_functions.php' http://localhost/install.php 2>/dev/null
+                                  if grep -q 'onclick=' /curl.out 2>/dev/null; then
+                                    break
+                                  fi
+                                  rm -f /curl.out
                                   sleep 20
                                   let count+=1
                                 done
-                                sed -ni '/onclick=\\x27this.select();\\x27>/,/<\\/textarea>/p' /curl.out
-                                sed -i -e "1d" /curl.out
-                                temp=`tail -1 /curl.out | cut -d';' -f1`; sed '$$d' /curl.out > /mysql-rc.sql; echo $$temp';' >> /mysql-rc.sql
-                                mysql -h ${RDSCluster.Endpoint.Address} -u master -D redcap --password='${DatabaseMasterPassword}' < /mysql-rc.sql
-                                mysql -h ${RDSCluster.Endpoint.Address} -u master -D redcap --password='${DatabaseMasterPassword}' < /var/app/current/create-initial-user.sql
+                                if [ -s /curl.out ]; then
+                                  sed -ni '/onclick=\\x27this.select();\\x27>/,/<\\/textarea>/p' /curl.out
+                                  sed -i -e "1d" /curl.out
+                                  temp=`tail -1 /curl.out | cut -d';' -f1`; sed '$$d' /curl.out > /mysql-rc.sql; echo $$temp';' >> /mysql-rc.sql
+                                  mysql -h ${RDSCluster.Endpoint.Address} -u master -D redcap --password='${DatabaseMasterPassword}' < /mysql-rc.sql
+                                  mysql -h ${RDSCluster.Endpoint.Address} -u master -D redcap --password='${DatabaseMasterPassword}' < /var/app/current/create-initial-user.sql
+                                fi
                         fi
                       fi
                       rm -f /curl.out /mysql.sql /mysql-rc.sql
