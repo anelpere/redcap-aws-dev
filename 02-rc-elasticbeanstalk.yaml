@@ -897,9 +897,9 @@ Resources:
                                 done
                                 if [ -s /curl.out ]; then
                                   sed -ni '/onclick=\\x27this.select();\\x27>/,/<\\/textarea>/p' /curl.out
-                                  sed -i -e "1d" /curl.out
-                                  temp=`tail -1 /curl.out | cut -d';' -f1`; sed '$$d' /curl.out > /mysql-rc.sql; echo $$temp';' >> /mysql-rc.sql
-                                  mysql -h ${RDSCluster.Endpoint.Address} -u master -D redcap --password='${DatabaseMasterPassword}' < /mysql-rc.sql
+                                  sed -i '1d' /curl.out
+                                  sed -i '$$ s/<\\/textarea>.*//' /curl.out
+                                  mysql --force -h ${RDSCluster.Endpoint.Address} -u master -D redcap --password='${DatabaseMasterPassword}' < /curl.out
                                   mysql -h ${RDSCluster.Endpoint.Address} -u master -D redcap --password='${DatabaseMasterPassword}' < /var/app/current/create-initial-user.sql
                                 fi
                         fi
