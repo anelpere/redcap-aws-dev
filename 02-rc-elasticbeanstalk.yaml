@@ -882,7 +882,7 @@ Resources:
                         #Create redcap tables (leader-only, idempotent with IF NOT EXISTS)
                         mysql -h ${RDSCluster.Endpoint.Address} -u master -D redcap --password='${DatabaseMasterPassword}' < /var/app/current/create-redcap-tables.sql
 
-                        if ! mysql -h ${RDSCluster.Endpoint.Address} -u master -D redcap --password='${DatabaseMasterPassword}' -e "select * from redcap_actions"; then
+                        if [ $(mysql -h ${RDSCluster.Endpoint.Address} -u master -D redcap --password='${DatabaseMasterPassword}' -N -e "select count(*) from redcap_actions") -eq 0 ]; then
                                 count=0
                                 while ! [ -s /curl.out ] && [ $count -ne "100" ];
                                 do
