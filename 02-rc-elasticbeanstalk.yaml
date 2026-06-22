@@ -911,7 +911,7 @@ Resources:
                       sed -i "s/upload_max_filesize = 2M/upload_max_filesize = 256M/" /etc/php.ini
                       sed -i "s/post_max_size = 8M/post_max_size = 256M/" /etc/php.ini
                       
-                      if [ "https://" == 'https://' ]; then
+                      if [ "${UseACMBoolean}" == 'true' ]; then
                         echo "session.cookie_secure = on" >> /etc/php.ini
                       fi
                       
