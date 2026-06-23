@@ -908,10 +908,11 @@ Resources:
                         mysql -h ${RDSCluster.Endpoint.Address} -u master -D redcap --password='${DatabaseMasterPassword}' < /var/app/current/create-redcap-tables.sql
 
                         if [ $(mysql -h ${RDSCluster.Endpoint.Address} -u master -D redcap --password='${DatabaseMasterPassword}' -N -e "select count(*) from redcap_actions") -eq 0 ]; then
+                                if [ "${UseACMBoolean}" == 'true' ]; then rc_protocol="https"; else rc_protocol="http"; fi
                                 count=0
                                 while [ $count -ne "100" ];
                                 do
-                                  curl -o /curl.out -k -F redcap_csrf_token= -F superusers_only_create_project=0 -F superusers_only_move_to_prod=1 -F auto_report_stats=1 -F bioportal_api_token= -F redcap_base_url='http://localhost/' -F enable_url_shortener=1 -F default_datetime_format='D/M/Y_12' -F default_number_format_decimal=, -F default_number_format_thousands_sep=. -F homepage_contact='REDCap Administrator (123-456-7890)' -F homepage_contact_email=email@yoursite.edu -F project_contact_name='REDCap Administrator (123-456-7890)' -F project_contact_email=email@yoursite.edu -F institution='SoAndSo University' -F site_org_type='SoAndSo Institute for Clinical and Translational Research' -F hook_functions_file='/var/app/current/redcap/hook_functions.php' http://localhost/install.php 2>/dev/null
+                                  curl -o /curl.out -k -F redcap_csrf_token= -F superusers_only_create_project=0 -F superusers_only_move_to_prod=1 -F auto_report_stats=1 -F bioportal_api_token= -F redcap_base_url="$rc_protocol://${EBEndpoint}.${AWS::Region}.elasticbeanstalk.com/" -F enable_url_shortener=1 -F default_datetime_format='D/M/Y_12' -F default_number_format_decimal=, -F default_number_format_thousands_sep=. -F homepage_contact='REDCap Administrator (123-456-7890)' -F homepage_contact_email=email@yoursite.edu -F project_contact_name='REDCap Administrator (123-456-7890)' -F project_contact_email=email@yoursite.edu -F institution='SoAndSo University' -F site_org_type='SoAndSo Institute for Clinical and Translational Research' -F hook_functions_file='/var/app/current/redcap/hook_functions.php' http://localhost/install.php 2>/dev/null
                                   if grep -q 'onclick=' /curl.out 2>/dev/null; then
                                     break
                                   fi
@@ -1095,11 +1096,6 @@ Resources:
                   if install_sql:
                       # Make CREATE TABLE statements idempotent
                       install_sql = install_sql.replace('CREATE TABLE ', 'CREATE TABLE IF NOT EXISTS ')
-                      # Fix hardcoded base URL
-                      install_sql = install_sql.replace(
-                          "UPDATE redcap_config SET value = 'http://anelpere-ec2-temp-test-4.us-east-1.elasticbeanstalk.com/' WHERE field_name = 'redcap_base_url'",
-                          "UPDATE redcap_config SET value = 'https://${EBEndpoint}.${AWS::Region}.elasticbeanstalk.com/' WHERE field_name = 'redcap_base_url'"
-                      )
                       config_files['create-redcap-tables.sql'] = install_sql
                   else:
                       print('WARNING: install.sql not found in REDCap zip')
