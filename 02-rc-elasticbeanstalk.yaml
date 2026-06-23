@@ -960,6 +960,28 @@ Resources:
                       else
                       echo "Already ran EB configuration scripts.  This must be an application redeployment"
                       fi
+                      
+                      #Harden filesystem permissions (runs on every deploy since EB resets
+                      #ownership when it extracts the app). Deny the web server (PHP-FPM) write
+                      #access to the REDCap code directory, except /temp/ and /modules/ which
+                      #REDCap requires to remain writable for the web server user.
+                      #Detect the PHP-FPM worker user (the non-root user running php-fpm).
+                      fpm_user=$(ps -o user= -C php-fpm 2>/dev/null | grep -vx root | sort -u | head -n1)
+                      [ -z "$fpm_user" ] && fpm_user=webapp
+                      redcap_dir=/var/app/current/redcap
+                      if [ -d "$redcap_dir" ]; then
+                        #Code owned by root and non-writable by the web server
+                        chown -R root:root "$redcap_dir"
+                        find "$redcap_dir" -type d -exec chmod 755 {} +
+                        find "$redcap_dir" -type f -exec chmod 644 {} +
+                        #Grant write access only to the folders REDCap must write to,
+                        #scoped to the PHP-FPM worker user rather than world-writable.
+                        for w in temp modules; do
+                          mkdir -p "$redcap_dir/$w"
+                          chown -R "$fpm_user":"$fpm_user" "$redcap_dir/$w"
+                          chmod -R u+rwX "$redcap_dir/$w"
+                        done
+                      fi
                   """)
                   
                   # .platform/nginx/conf.d/https.conf
