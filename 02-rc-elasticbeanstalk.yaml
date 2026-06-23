@@ -564,6 +564,14 @@ Resources:
         Ref: RDSDBSubnets
       VpcSecurityGroupIds:
         - !Ref SGData
+# Custom DB parameter group to raise max_allowed_packet to 1 GB (instance-level parameter)
+  RDSDBParameterGroup:
+    Type: AWS::RDS::DBParameterGroup
+    Properties:
+      Description: Custom parameter group for REDCap Aurora MySQL instances
+      Family: aurora-mysql8.0
+      Parameters:
+        max_allowed_packet: '1073741824'
   RDSDBInstance1:
     Type: AWS::RDS::DBInstance
     Properties:
@@ -572,6 +580,8 @@ Resources:
       Engine: aurora-mysql
       DBClusterIdentifier:
         Ref: RDSCluster
+      DBParameterGroupName:
+        Ref: RDSDBParameterGroup
       PubliclyAccessible: 'false'
       DBInstanceClass: !Ref DatabaseInstanceType
 # Only create the second instance if the user specified a Multi-AZ Database  
@@ -584,6 +594,8 @@ Resources:
       Engine: aurora-mysql
       DBClusterIdentifier:
         Ref: RDSCluster
+      DBParameterGroupName:
+        Ref: RDSDBParameterGroup
       PubliclyAccessible: 'false'
       DBInstanceClass: !Ref DatabaseInstanceType
   RDSDBSubnets:
