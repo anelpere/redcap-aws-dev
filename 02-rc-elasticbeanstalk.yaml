@@ -870,7 +870,19 @@ Resources:
                       fi
                       
                       #Install required packages
-                      dnf install -y php-ldap sendmail-cf postfix mariadb105
+                      dnf install -y php-ldap sendmail-cf postfix mariadb105 ImageMagick ImageMagick-devel
+
+                      #Check and update PHP Extensions
+                      pecl channel-update pecl.php.net
+                      pecl install imagick
+
+                      #Make the imagick extension executable (path depends on PHP version)
+                      imagick_path="$(php -r 'echo ini_get("extension_dir");')/imagick.so"
+                      if [ -f "$imagick_path" ]; then
+                        chmod +x "$imagick_path"
+                      else
+                        echo "WARNING: imagick.so not found at $imagick_path"
+                      fi
                       
                       #Apply 'salt' string from AWS SSM to the database.php file
                       sed -i "s#\\$salt = '';#\\$salt = '`aws ssm get-parameter --name redcap-salt --with-decryption --query 'Parameter.Value' --output text`';#" /var/app/current/redcap/database.php
